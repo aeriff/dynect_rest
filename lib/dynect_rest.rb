@@ -218,22 +218,20 @@ class DynectRest
 
   # Handles making Dynect API requests and formatting the responses properly.
   def api_request(&block)
-    response_body = begin
+    begin
       response = block.call
-      response.body
+      parse_response(JSON.parse(response.body || '{}'))
     rescue RestClient::Exception => e
       if @verbose
         puts "I have #{e.inspect} with #{e.http_code}"
       end
-      if e.http_code == 307
-        e.response.sub!(/^\/REST\//,'')
-        get(e.response)
+      if e.http_code != 307
+        # Something went wrong, so escalate to caller
+        raise DynectRest::Exceptions::RequestFailed, "Request failed: #{e.inspect}"
       end
-      # Something went wrong, so escalate to caller
-      raise DynectRest::Exceptions::RequestFailed, "Request failed: #{e.inspect}"
+      e.response.sub!(/^\/REST\//,'')
+      get(e.response)
     end
-
-    parse_response(JSON.parse(response_body || '{}'))
   end
 
   def parse_response(response)
